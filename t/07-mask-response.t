@@ -4,12 +4,12 @@ use warnings;
 use Test::More;
 use if $ENV{AUTHOR_TESTING}, 'Test::Warnings';
 
-use Test::LWP::UserAgent;
+use Test::HTTP::Thin;
 
 {
-    my $useragent = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
     $useragent->map_response('bar.com', HTTP::Response->new('200'));
-    Test::LWP::UserAgent->map_response('foo.com', HTTP::Response->new('201'));
+    Test::HTTP::Thin->map_response('foo.com', HTTP::Response->new('201'));
     $useragent->map_response('foo.com', undef);
 
     my $response = $useragent->get('http://foo.com');
@@ -17,7 +17,7 @@ use Test::LWP::UserAgent;
 }
 
 {
-    my $useragent = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
 
     $useragent->map_response('bar.com', HTTP::Response->new('200'));
     $useragent->map_response('foo.com', HTTP::Response->new('201'));
@@ -48,9 +48,9 @@ use Test::LWP::UserAgent;
 # same tests as above are repeated, but with overloaded string objects.
 
 {
-    my $useragent = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
     $useragent->map_response(MyHost->new('bar.com'), HTTP::Response->new('200'));
-    Test::LWP::UserAgent->map_response(MyHost->new('foo.com'), HTTP::Response->new('201'));
+    Test::HTTP::Thin->map_response(MyHost->new('foo.com'), HTTP::Response->new('201'));
     $useragent->map_response(MyHost->new('foo.com'), undef);
 
     my $response = $useragent->get('http://foo.com');
@@ -58,7 +58,7 @@ use Test::LWP::UserAgent;
 }
 
 {
-    my $useragent = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
 
     $useragent->map_response(MyHost->new('bar.com'), HTTP::Response->new('200'));
     $useragent->map_response(MyHost->new('foo.com'), HTTP::Response->new('201'));

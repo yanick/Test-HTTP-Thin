@@ -5,7 +5,7 @@ use Test::More;
 use Test::Deep;
 use if $ENV{AUTHOR_TESTING}, 'Test::Warnings';
 
-use Test::LWP::UserAgent;
+use Test::HTTP::Thin;
 
 {
     package MyRequest;
@@ -46,7 +46,7 @@ use Test::LWP::UserAgent;
 
 {
     # mapped response is a thingy that quacks like a coderef
-    my $useragent = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
     $useragent->map_response(bless({}, 'MyRequest'), bless({}, 'MyResponse'));
 
     my $response = $useragent->get('http://localhost');
@@ -60,7 +60,7 @@ SKIP: {
         or skip('HTTP::Message::PSGI is required for the remainder of these tests', 3);
 
     # mapped response is a coderef that turns a PSGI $env into an HTTP response
-    my $useragent = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
     $useragent->register_psgi(MyHost->new('localhost'),
         sub { [ '200', [], ['home sweet home'] ] });
 

@@ -17,7 +17,7 @@ BEGIN {
 use Test::RequiresInternet ( 'www.iana.org' => 80 );
 
 use if $ENV{AUTHOR_TESTING}, 'Test::Warnings';
-use Test::LWP::UserAgent;
+use Test::HTTP::Thin;
 use HTTP::Request::Common;
 use URI;
 
@@ -26,14 +26,16 @@ use URI;
 # shorter than the second.
 my $redirect_url = 'http://www.iana.org/domains/example/';
 
-# allow LWP::UserAgent to carp about unknown constructor arguments
+# allow HTTP::Thin to carp about unknown constructor arguments
 $^W = 1;
 
-{
-    my $useragent = Test::LWP::UserAgent->new;
-    my $useragent2 = Test::LWP::UserAgent->new;
+local $TODO = "not quite ready yet";
 
-    ok(!Test::LWP::UserAgent->network_fallback, 'network_fallback not set globally');
+{
+    my $useragent = Test::HTTP::Thin->new;
+    my $useragent2 = Test::HTTP::Thin->new;
+
+    ok(!Test::HTTP::Thin->network_fallback, 'network_fallback not set globally');
     ok(!$useragent->network_fallback, 'network_fallback not enabled for the instance');
     ok(!$useragent2->network_fallback, 'network_fallback not enabled for the other instance');
 
@@ -53,21 +55,21 @@ $^W = 1;
 }
 
 {
-    my $useragent = Test::LWP::UserAgent->new;
-    my $useragent2 = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
+    my $useragent2 = Test::HTTP::Thin->new;
 
     $useragent->network_fallback(1);
     ok($useragent->network_fallback, 'network_fallback enabled for the instance');
 
-    Test::LWP::UserAgent->network_fallback(1);
-    ok(Test::LWP::UserAgent->network_fallback, 'network_fallback set globally');
+    Test::HTTP::Thin->network_fallback(1);
+    ok(Test::HTTP::Thin->network_fallback, 'network_fallback set globally');
     ok($useragent->network_fallback, 'network_fallback enabled for the instance');
     ok($useragent->network_fallback, 'network_fallback enabled for the other instance');
 
     test_send_request('network_fallback on other instance', $useragent2, POST($redirect_url), '302');
     test_send_request('network_fallback, with redirect', $useragent2, GET($redirect_url), '200');
 
-    Test::LWP::UserAgent->network_fallback(0);
+    Test::HTTP::Thin->network_fallback(0);
     ok($useragent->network_fallback, 'network_fallback still enabled for the instance');
     ok(!$useragent2->network_fallback, 'network_fallback not enabled for the other instance');
 
@@ -76,8 +78,8 @@ $^W = 1;
 }
 
 {
-    my $useragent = Test::LWP::UserAgent->new;
-    my $useragent2 = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
+    my $useragent2 = Test::HTTP::Thin->new;
 
     my $host = URI->new($redirect_url)->host;
     $useragent->map_network_response($host);
@@ -85,16 +87,16 @@ $^W = 1;
     test_send_request('network response mapped on instance', $useragent, POST($redirect_url), '302');
     test_send_request('network response not mapped on other instance', $useragent2, POST($redirect_url), '404');
 
-    Test::LWP::UserAgent->map_network_response($host);
+    Test::HTTP::Thin->map_network_response($host);
     test_send_request('network response mapped globally', $useragent2, POST($redirect_url), '302');
-    Test::LWP::UserAgent->unmap_all;
+    Test::HTTP::Thin->unmap_all;
 }
 
 {
-    my $useragent = Test::LWP::UserAgent->new(network_fallback => 1);
-    my $useragent2 = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new(network_fallback => 1);
+    my $useragent2 = Test::HTTP::Thin->new;
 
-    ok(!Test::LWP::UserAgent->network_fallback, 'network_fallback not set globally');
+    ok(!Test::HTTP::Thin->network_fallback, 'network_fallback not set globally');
     ok($useragent->network_fallback, 'network_fallback enabled for the instance');
     ok(!$useragent2->network_fallback, 'network_fallback not enabled for the other instance');
 

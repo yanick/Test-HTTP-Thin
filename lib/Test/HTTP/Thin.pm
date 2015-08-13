@@ -230,11 +230,8 @@ sub _request {
         request_args_to_request($method,$uri,$args);
     };
     warn $@ if $@;
-    use Data::Printer; p $request;
 
     my $matched_response;
-
-    $DB::single = 1;
 
     foreach my $entry (@{$self->{__response_map}}, @response_map)
     {

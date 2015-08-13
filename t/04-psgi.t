@@ -6,7 +6,7 @@ use Test::More;
 use if $ENV{AUTHOR_TESTING}, 'Test::Warnings';
 use Test::Deep;
 
-use Test::LWP::UserAgent;
+use Test::HTTP::Thin;
 use Scalar::Util 'refaddr';
 use HTTP::Request::Common;
 
@@ -36,12 +36,12 @@ my $app_baz = sub {
 };
 
 {
-    my $useragent = Test::LWP::UserAgent->new;
-    my $useragent2 = Test::LWP::UserAgent->new;
+    my $useragent = Test::HTTP::Thin->new;
+    my $useragent2 = Test::HTTP::Thin->new;
 
-    Test::LWP::UserAgent->register_psgi('foo', $app_foo);
+    Test::HTTP::Thin->register_psgi('foo', $app_foo);
     $useragent->register_psgi('bar', $app_bar);
-    Test::LWP::UserAgent->register_psgi('bar', $app_bar2);
+    Test::HTTP::Thin->register_psgi('bar', $app_bar2);
     $useragent2->register_psgi('baz', $app_baz);
 
     test_send_request('foo app (registered globally)', $useragent, GET('http://foo'),

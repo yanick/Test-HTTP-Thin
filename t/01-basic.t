@@ -14,10 +14,10 @@ use Scalar::Util 'refaddr';
 
     use URI;
     use HTTP::Request::Common;
-    use LWP::UserAgent;
+    use HTTP::Thin;
 
     # in real code, you might want a Moose lazy _build_ua sub for this
-    our $useragent = LWP::UserAgent->new;
+    our $useragent = HTTP::Thin->new;
 
     sub send_to_url
     {
@@ -38,8 +38,8 @@ use Scalar::Util 'refaddr';
     }
 }
 
-use Test::LWP::UserAgent;
-my $class = 'Test::LWP::UserAgent';
+use Test::HTTP::Thin;
+my $class = 'Test::HTTP::Thin';
 
 cmp_deeply(
     $class,
@@ -56,7 +56,7 @@ cmp_deeply(
     $class->new,
     all(
         isa($class),
-        isa('LWP::UserAgent'),
+        isa('HTTP::Thin'),
         methods(
             last_http_request_sent => undef,
             last_http_response_received => undef,
@@ -119,11 +119,11 @@ cmp_deeply(
         $MyApp::useragent,
         all(
             isa($class),
-            isa('LWP::UserAgent'),
+            isa('HTTP::Thin'),
             methods(
                 last_http_request_sent => undef,
                 last_http_response_received => undef,
-                last_useragent => isa('LWP::UserAgent'),
+                last_useragent => isa('HTTP::Thin'),
             ),
             noclass(superhashof({
                 __last_http_request_sent => undef,
@@ -163,54 +163,56 @@ sub test_send_request
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
-    note "\n", $name;
+    subtest $name => sub {
 
-    my $response = MyApp->send_to_url($method, $uri_base, $port, $path, %$params);
+        my $response = MyApp->send_to_url($method, $uri_base, $port, $path, %$params);
 
-    # response is what we stored in the useragent
-    isa_ok($response, 'HTTP::Response');
-    is(
-        refaddr($MyApp::useragent->last_http_response_received),
-        refaddr($response),
-        'last_http_response_received',
-    );
+        # response is what we stored in the useragent
+        isa_ok($response, 'HTTP::Response');
+        is(
+            refaddr($MyApp::useragent->last_http_response_received),
+            refaddr($response),
+            'last_http_response_received',
+        );
 
-    cmp_deeply(
-        $MyApp::useragent->last_http_request_sent,
-        all(
-            isa('HTTP::Request'),
-            methods(
-                uri => $expected_uri,
+        cmp_deeply(
+            $MyApp::useragent->last_http_request_sent,
+            all(
+                isa('HTTP::Request'),
+                methods(
+                    uri => $expected_uri,
+                ),
             ),
-        ),
-        "$name request",
-    );
+            "$name request",
+        );
 
-    is(
-        refaddr($MyApp::useragent->last_useragent),
-        refaddr($MyApp::useragent),
-        'last_useragent (class method)',
-    );
+        is(
+            refaddr($MyApp::useragent->last_useragent),
+            refaddr($MyApp::useragent),
+            'last_useragent (class method)',
+        );
 
-    cmp_deeply(
-        refaddr(Test::LWP::UserAgent->last_useragent),
-        refaddr($MyApp::useragent),
-        'last_useragent (instance method)',
-    );
+        cmp_deeply(
+            refaddr(Test::HTTP::Thin->last_useragent),
+            refaddr($MyApp::useragent),
+            'last_useragent (instance method)',
+        );
 
-    cmp_deeply(
-        $response,
-        methods(
-            code => $expected_code,
-            request => $MyApp::useragent->last_http_request_sent,
-        ),
-        "$name response",
-    );
+        cmp_deeply(
+            $response,
+            methods(
+                code => $expected_code,
+                request => $MyApp::useragent->last_http_request_sent,
+            ),
+            'response',
+        );
 
-    ok(
-        HTTP::Date::parse_date($response->header('Client-Date')),
-        'Client-Date is a timestamp',
-    );
+        ok(
+            HTTP::Date::parse_date($response->header('Client-Date')),
+            'Client-Date is a timestamp',
+        );
+
+    }
 }
 
 done_testing;

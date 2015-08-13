@@ -1,13 +1,12 @@
 use strict;
 use warnings;
-package Test::LWP::UserAgent;
-# ABSTRACT: A LWP::UserAgent suitable for simulating and testing network calls
+package Test::HTTP::Thin;
+# ABSTRACT: A HTTP::Tiny useragent suitable for simulating and testing network calls
 # KEYWORDS: testing useragent networking mock server client
-# vim: set ts=8 sts=4 sw=4 tw=115 et :
 
-our $VERSION = '0.030';
+our $VERSION = '0.001';
 
-use parent 'LWP::UserAgent';
+use parent 'HTTP::Thin';
 use Scalar::Util qw(blessed reftype);
 use Storable 'freeze';
 use HTTP::Request;
@@ -18,6 +17,8 @@ use HTTP::Status qw(:constants status_message);
 use Try::Tiny;
 use Safe::Isa;
 use Carp;
+use Class::Method::Modifiers;
+
 use namespace::clean 0.19 -also => [qw(__isa_coderef __is_regexp)];
 
 my @response_map;
@@ -199,14 +200,41 @@ sub network_fallback
     $network_fallback = $value;
 }
 
-sub send_request
-{
-    my ($self, $request, $arg, $size) = @_;
+sub request_args_to_request {
+    return shift if @_ == 1;
 
-    $self->progress('begin', $request);
-    my $matched_response = $self->run_handlers('request_send', $request);
+    my( $method, $url, $options ) = @_;
 
-    my $uri = $request->uri;
+    return HTTP::Request->new(
+        $method, $url, HTTP::Headers->new( %{ $options->{headers} || {} } ), $options->{content} || undef 
+    );
+
+}
+
+around 'request' => sub {
+    my( $original, $self, @args ) = @_;
+
+    my $request = $self->{__last_http_request_sent} = request_args_to_request(@args);
+
+    my $resp = $self->{__last_http_response_received} = $original->($self, @args);
+
+    $resp->request($request);
+
+    return $resp;
+};
+
+sub _request {
+    my ($self, $method, $uri, $args) = @_;
+
+    my $request = eval {
+        request_args_to_request($method,$uri,$args);
+    };
+    warn $@ if $@;
+    use Data::Printer; p $request;
+
+    my $matched_response;
+
+    $DB::single = 1;
 
     foreach my $entry (@{$self->{__response_map}}, @response_map)
     {
@@ -239,14 +267,11 @@ sub send_request
     }
 
     $last_useragent = $self;
-    $self->{__last_http_request_sent} = $request;
 
     if (not defined $matched_response and
         ($self->{__network_fallback} or $network_fallback))
     {
-        my $response = $self->SUPER::send_request($request, $arg, $size);
-        $self->{__last_http_response_received} = $response;
-        return $response;
+        return $self->SUPER::_request($method,$uri,$args);
     }
 
     my $response = defined $matched_response
@@ -255,32 +280,7 @@ sub send_request
 
     if (__isa_coderef($response))
     {
-        # emulates handling in LWP::UserAgent::send_request
-        if ($self->use_eval)
-        {
-            $response = try { $response->($request) }
-            catch {
-                my $exception = $_;
-                if ($exception->$_isa('HTTP::Response'))
-                {
-                    $response = $exception;
-                }
-                else
-                {
-                    my $full = $exception;
-                    (my $status = $exception) =~ s/\n.*//s;
-                    $status =~ s/ at .* line \d+.*//s;  # remove file/line number
-                    my $code = ($status =~ s/^(\d\d\d)\s+//) ? $1 : HTTP_INTERNAL_SERVER_ERROR;
-                    # note that _new_response did not always take a fourth
-                    # parameter - content used to always be "$code $message"
-                    $response = LWP::UserAgent::_new_response($request, $code, $status, $full);
-                }
-            }
-        }
-        else
-        {
-            $response = $response->($request);
-        }
+        $response = $response->($request);
     }
 
     if (not $response->$_isa('HTTP::Response'))
@@ -295,25 +295,7 @@ sub send_request
         $response->header('Client-Date' => HTTP::Date::time2str(time));
     }
 
-    # handle any additional arguments that were provided, such as saving the
-    # content to a file.  this also runs additional handlers for us.
-    my $protocol = LWP::Protocol->new('no-schemes-from-TLWPUA', $self);
-    my $complete;
-    $response = $protocol->collect($arg, $response, sub {
-        # remove content from $response and stream it back
-        return \'' if $complete;
-        my $content = $response->content;
-        $response->content('');
-        $complete++;
-        \$content;
-    });
-
-    $self->run_handlers('response_done', $response);
-    $self->progress('end', $response);
-
-    $self->{__last_http_response_received} = $response;
-
-    return $response;
+    return http_response_to_hash($response);
 }
 
 sub __isa_coderef
@@ -326,6 +308,21 @@ sub __isa_coderef
 sub __is_regexp
 {
     re->can('is_regexp') ? re::is_regexp(shift) : ref(shift) eq 'Regexp';
+}
+
+sub http_response_to_hash {
+    my $resp = shift;
+
+    return $resp unless ref $resp eq 'HTTP::Response';
+
+    return {
+        status => $resp->code,
+        reason => $resp->message,
+        headers => {
+            map { $_ => $resp->header($_) } $resp->header_field_names
+        },
+        content => $resp->content,
+    },
 }
 
 1;
